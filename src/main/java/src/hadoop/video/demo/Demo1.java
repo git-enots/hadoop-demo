@@ -3,15 +3,50 @@ package src.hadoop.video.demo;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLConnection;
 
+import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsUrlStreamHandlerFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 
 public class Demo1 {
-
+    public void readHDFSfileJavaNet(){
+    	try{
+    		URL.setURLStreamHandlerFactory(new FsUrlStreamHandlerFactory());
+    		URL url=new URL("hdfs://192.168.157.111:9000/bbb/a.txt");
+    		URLConnection urlcon=url.openConnection();
+    		InputStream is=urlcon.getInputStream();
+    		int len=0;
+    		byte[] buf=new byte[1024];
+    		while((len=is.read(buf))!=-1){
+    			System.out.println(new String(buf,0,len));
+    		}
+    		is.close();
+    	}
+    	catch(Exception e){}
+    }
+    public void testRead(){
+    	try{
+    		Configuration conf = new Configuration();
+    		conf.set("fs.defaultFS", "hdfs://192.168.157.111:9000");
+    		FileSystem client = FileSystem.get(conf);
+    		Path path=new Path("/bbb/a.txt");
+    		FSDataInputStream fsDataInputStream=client.open(path);
+    		ByteArrayOutputStream byteArrayOutputStream=new ByteArrayOutputStream();
+    		IOUtils.copyBytes(fsDataInputStream, byteArrayOutputStream, conf);
+    		System.out.println(byteArrayOutputStream.toString());
+    		IOUtils.closeStream(byteArrayOutputStream);
+    		IOUtils.closeStream(fsDataInputStream);
+    		
+    	}
+    	catch(Exception e){}
+    }
 	@Test
 	public void testMkDir() throws Exception{
 		//这是一个客户端，链接到服务器上
@@ -51,7 +86,11 @@ public class Demo1 {
 		OutputStream out = client.create(new Path("/bbb/a.txt"));
 		
 		//上传数据: 使用HDFS的工具类
-		IOUtils.copyBytes(in, out, 1024);		
+		IOUtils.copyBytes(in, out, 1024);	
+		
+		IOUtils.closeStream(in);
+		
+		IOUtils.closeStream(out);
 		
 		//关闭客户端
 		client.close();

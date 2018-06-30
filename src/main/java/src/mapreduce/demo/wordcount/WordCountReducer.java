@@ -10,7 +10,7 @@ public class WordCountReducer extends Reducer<Text, LongWritable, Text, LongWrit
 
 	@Override
 	protected void reduce(Text k3, Iterable<LongWritable> v3,Context context) throws IOException, InterruptedException {
-		//v3: 是一个集合，每个元素就是v2
+		//v3: 是一个集合，每个元素就是v2 相同的k3 会被同一个reduce处理
 		long total = 0;
 		for(LongWritable l:v3){
 			total = total + l.get();
