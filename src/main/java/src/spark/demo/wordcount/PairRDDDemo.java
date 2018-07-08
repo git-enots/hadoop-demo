@@ -1,6 +1,7 @@
 package src.spark.demo.wordcount;
 
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -29,19 +30,20 @@ public class PairRDDDemo {
     private static JavaSparkContext sc;
 
     public static void main(String[] args) {
-        JavaPairRDD<Integer, Integer> pairs = createPairRDD();
-        reduceByKey(pairs);
-        groupByKey(pairs);
-        keys(pairs);
-        values(pairs);
-        sortByKey(pairs);
-        distinct(pairs);
-        maxValue(pairs);
-        mapValues(pairs);
-        flatMapValues(pairs);
-        countByKey(pairs);
-        collectAsMap(pairs);
-        lookup(pairs);
+//        JavaPairRDD<Integer, Integer> pairs = createPairRDD();
+//        reduceByKey(pairs);
+//        groupByKey(pairs);
+//        keys(pairs);
+//        values(pairs);
+//        sortByKey(pairs);
+//        distinct(pairs);
+//        maxValue(pairs);
+//        mapValues(pairs);
+//        flatMapValues(pairs);
+//        countByKey(pairs);
+//        collectAsMap(pairs);
+//        lookup(pairs);
+    	createFriendsPairRDD();
     }
 
     /**
@@ -228,5 +230,92 @@ public class PairRDDDemo {
         System.out.println("转换后的键值对=" + pairs.collect());
         return pairs;
     }
+    
+    /**
+     * 
+     * 模拟好友精准推荐 找出共同好友 然后共同好友互相推荐
+A:C,D,F,E,O
+B:A,C,E,K,Z
+C:F,A,D,I
+D:A,E,F,L
+E:B,C,D,M,L
+F:A,B,C,D,E,O,M
+G:A,C,D,E,F
+H:A,C,D,E,O
+I:A,O
+J:B,O
+K:A,C,D
+L:D,E,F
+M:F,G
+O:A,H,I,J
 
+     * @return
+     */
+    private static JavaPairRDD<String, String> createFriendsPairRDD(){
+    	 List<String> list = Arrays.asList("A:C,D,F,E,O","B:A,C,E,K,Z",
+    			 "C:F,A,D,I","D:A,E,F,L","E:B,C,D,M,L","F:A,B,C,D,E,O,M",
+    			 "G:A,C,D,E,F","H:A,C,D,E,O","I:A,O","J:B,O",
+    			 "K:A,C,D","L:D,E,F","M:F,G","O:A,H,I,J");
+    	 SparkConf conf = new SparkConf().setMaster("local").setAppName("PairRDDDemo");
+         sc = new JavaSparkContext(conf);
+         sc.setLogLevel("ERROR");
+         JavaRDD<String> rdd = sc.parallelize(list, 2); 
+//         JavaPairRDD<String, String> pairs = rdd.flatMapToPair(new PairFlatMapFunction<String, String, String>() {
+//        	 
+//             @Override
+//             public Iterator<Tuple2<String, String>> call(String s) throws Exception {
+//                 String[] temp=s.split(":");
+//                 String persion = temp[0];
+//                 String frends =  temp[1];
+//                 String[] friends=frends.split(",");
+//                 ArrayList<Tuple2<String,String>> list=new ArrayList<Tuple2<String,String>>();
+//                 for(String friend:friends){
+//                	 list.add(new Tuple2<String,String>(friend,persion));
+//                 }
+//                
+//                 return list.iterator();
+//             }
+//         });
+         	JavaPairRDD<String, String> keyStep1 = rdd.flatMapToPair((String s)-> {
+                 String[] temp=s.split(":");
+                 String persion = temp[0];
+                 String frends =  temp[1];
+                 String[] friends=frends.split(",");
+                 ArrayList<Tuple2<String,String>> friendsList=new ArrayList<Tuple2<String,String>>();
+                 for(String friend:friends){
+                	 friendsList.add(new Tuple2<String,String>(friend,persion));
+                 }
+                
+                 return friendsList.iterator();
+             }
+         );
+         System.out.println("阶段1=" + keyStep1.collect());
+         JavaPairRDD<String, String> reduceStep1 = keyStep1.reduceByKey(
+         		(String i1,String i2)->(i1+"&"+i2)
+         		);
+         System.out.println("阶段1=" + reduceStep1.collect());
+         JavaPairRDD<String, String> mapStep2= reduceStep1.flatMapToPair(tuple->{
+        	 	String key=tuple._1;
+        	 	String value=tuple._2;
+        	    List<Tuple2<String, String>> friendsList = new ArrayList<>();
+        	    String[] persions=value.split("&");
+        	    Arrays.sort(persions);
+			     for(int i=0;i<persions.length-1;i++){
+			    	 for(int j=i+1;j<(persions.length);j++){
+			    		 String tt=persions[j];
+			    		 friendsList.add(new Tuple2<String,String>(persions[i]+"-"+tt,key)); 
+			    	 }
+			     }
+        	    
+        	    return friendsList.iterator();
+        	});
+         System.out.println("阶段2=" + mapStep2.collect());
+         
+         JavaPairRDD<String, String> reduceStep2=mapStep2.reduceByKey((String i1,String i2)->(i1+" "+i2));
+         
+         System.out.println("阶段2=" + reduceStep2.sortByKey().collect());
+         return mapStep2;
+    }
+    
+   // private static
 }
