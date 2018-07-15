@@ -3,6 +3,7 @@ package src.spark.demo.wordcount;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -318,4 +319,42 @@ O:A,H,I,J
     }
     
    // private static
+    
+    public static void pageRank(){
+   	 List<String> list = Arrays.asList("A,B","A,C","A,D","B,E","B,D","C,A","C,D","D,C","D,F","E,B","E,C");
+        SparkConf conf = new SparkConf().setMaster("local[2]").setAppName("PairRDDDemo");
+        sc = new JavaSparkContext(conf);
+        sc.setLogLevel("ERROR");
+        JavaRDD<String> rdd = sc.parallelize(list, 2); 
+        JavaPairRDD<String, Iterable<String>> pairs =rdd.mapToPair((String row)->{
+       	  String[] rowArray=row.split(",");
+       	  return new Tuple2<String, String>(rowArray[0], rowArray[1]);
+        }).groupByKey();
+        JavaPairRDD<String, Double> ranks=pairs.mapValues(v1 ->1d);
+        JavaRDD<Tuple2<Iterable<String>, Double>> joins=  pairs.join(ranks).values();
+        JavaRDD<String> joinFlatMap=joins.flatMap((Tuple2<Iterable<String>, Double> tuple)->{
+       	 List<String> result=new ArrayList<String>();
+       	 Iterable<String> val1=tuple._1;
+       	 Double val2=tuple._2;
+       	 int size=getSize(val1);
+            for (Iterator<String> it = val1.iterator(); it.hasNext();){
+       		 result.add(it.next()+","+size/val2);
+       	 }	 
+       	 return  result.iterator();
+        });
+        JavaPairRDD<String, Double> joinMapPair =joinFlatMap.mapToPair((String row)->{
+      	  String[] rowArray=row.split(",");
+      	  return new Tuple2<String, Double>(rowArray[0], Double.valueOf(rowArray[1]));
+       }).reduceByKey((v1, v2) -> v1 + v2).mapValues(x->0.15+0.85*x);
+        
+       System.out.println(joinMapPair.collect());
+   }
+	   private static int  getSize(Iterable<String> val1){
+	   	int count=0;
+	   	for(Iterator<String> it = val1.iterator(); it.hasNext();){
+	   		it.next();
+	   		count++;
+	   	}
+	   	return count;
+	   }
 }
