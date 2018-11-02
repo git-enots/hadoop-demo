@@ -1,7 +1,7 @@
 package src.storm.demo.wordcount;
 
-import backtype.storm.Constants;
-import backtype.storm.tuple.Tuple;
+import org.apache.storm.Constants;
+import org.apache.storm.tuple.Tuple;
 
 public final class TupleHelpers {
 
